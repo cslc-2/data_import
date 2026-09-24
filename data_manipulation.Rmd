@@ -3,75 +3,183 @@ title: "Data Import"
 output: github_document
 ---
 
+This file is for doing data manipulation.
+
 ```{r setup}
 library(tidyverse)
-library(readxl)
-library(haven)
 ```
 
-## Read in some data
-
-Read in the litters dataset.
+load the litters and pups datasets.
 
 ```{r}
-litters_df = read_csv("./data/FAS_litters.csv")
+litters_df =
+  read_csv(
+    "data/FAS_litters.csv",
+    na = c("", "NA", "."))
+
 litters_df = janitor::clean_names(litters_df)
+
+pups_df =
+  read_csv(
+    "data/FAS_pups.csv",
+    na = c("", "NA", "."))
+
+pups_df = janitor::clean_names(pups_df)
 ```
 
-## Take a look at the data
+## `select` some variables
 
 ```{r}
-litters_df
+select(litters_df, group, litter_number)
+
+select(litters_df, group:gd_of_birth)
+
+select(litters_df, -group)
+
+select(litters_df, starts_with("gd"))
+
+select(litters_df, starts_with("gd"),group)
+
+select(litters_df, GROUP = group, everything())
+```
+
+a couple of alternatives
+
+```{r}
+rename(litters_df, GROUP = group)
+
+relocate(litters_df, litter_number, gd0_weight)
+```
+
+In the pups data, select litter number, sex, and PD ears. 
+
+```{r}
+select(pups_df, litter_number, sex, pd_ears)
+```
+
+## `filter` some rows
+
+```{r}
+filter(litters_df, gd_of_birth ==19)
+
+filter(litters_df, pups_born_alive <=5)
+
+filter(litters_df, pups_born_alive != 6)
+
+filter(litters_df, group %in% c("Con7", "Con8"))
+
+filter(litters_df, group %in% c("Con7", "Con8"), pups_born_alive < 7)
+
+filter(litters_df, pups_born_alive < 4 | pups_born_alive > 8)
+
+drop_na(litters_df, gd0weight)
+```
+
+In the pups dataset, keep only rows where PD walk is less than 11 and sex is 2.
+```{r}
+filter(litters_df, pd_wwalk < 11, sex == 2)
+```
+
+## `mutate` to change some columns
+
+let's add and change some columns
+
+```{r}
+mutate(litters_df, wt_gain = gd18_weight - gd0_weight)
+
+
+mutate(
+  litters_df,
+  wt_gain = gd18_weight - gd0_weight,
+  group = str_to_lower(group)
+)
+```
+
+In the pups dataset, create a variable that subtracts 7 from PD walk
+
+```{r}
+mutate(pups_df, pd_walk_minus_7 = pd_walk - 7)
 ```
 
 ```{r}
-head(litters_df)
-tail(litters_df)
+arrange(litters_df, pups_born_alive)
+arrange(litters_df, desc(pups_born_alive))
 ```
+
+## Do multiple steps...
+
+
+THIS IS AN INCORRECT WAY TO WRITE THIS!!!! DON'T DO THIS!
+```{r}
+litters_df = read_csv("data/FAS_litters.csv", na = c("","NA","."))
+litters_rename_df = janitor::clean_names(litters_df)
+litters_with_gd_df = select(litters_rename_df, group, starts_with("gd"))
+litters_no_na_df = drop_na(litters_with_gd_df)
+litters_wt_gain_df = mutate(litters_no_na_df, wt_gain = gd18_weight - gd0_weight)
+```
+
+Nesting is worse.
+
+Correct way:
+```{r}
+litters_df =
+  read_csv("data/FAS_litters.csv", na = c("","NA",".")) |> 
+  janitor::clean_names() |> 
+  select(group, starts_with("gd")) |> 
+  drop_na() |> 
+  mutate(
+    wt_gain = gd18_weight - gd0_weight,
+    group = str_to_lower(group)
+  )
+
+```
+
+Load pups, clean names, drop missing, keep litter number and pd variables, add pd walk - 7
 
 ```{r}
-skimr::skim(litters_df)
+pups_df =
+  read_csv("data/FAS_pups.csv", skip = 3, na = c("","NA",".")) |> 
+  janitor::clean_names() |> 
+  drop_na() |> 
+  select(litter_number, starts_with("pd")) |> 
+  mutate(
+    pd_walk_minus_7 = pd_walk - 7
+  )
+  
 ```
 
-## Options to read_csv
+Sometimes the first thing isn't a dataframe
 
-Check out `?read_csv()` for more information.
-
-## Other file formats
-
-Read in an excel file.
+`select` vs `pull`
+Select will select a data frame. Pull will pull the column out and treat it like a vector.
+You should almost never be taking stuff out of the data frame if you have a data frame.
 
 ```{r}
-mlb_df = read_excel("./data/mlb11.xlsx", range = "A1:F7")
-mlb_df
+litters_df |> 
+  select(group)
+
+litters_df |> 
+  pull(group)
 ```
 
-Read in a SAS file.
+never do `$`
 
 ```{r}
-pulse_df = read_sas("./data/public_pulse_data.sas7bdat")
-pulse_df
+litters_df$group
 ```
 
-## Comparison with Base R
-
-what about 'read.csv' ...?
+pipes and viewing
+But remember to delete view() before you publish your R markdown. It should just be a temporary step.
 
 ```{r}
-litters_base = read.csv("./data/FAS_litters.csv")
-litters_readr = read_csv("./data/FAS_litters.csv")
-
-litters_base
-litters_readr
+litters_df |> 
+  filter(group %in% c("con7", "con8")) |> 
+  view()
 ```
 
-## Exporting data
 
-Export the mlb sub-table. 
 
-```{r}
-write_csv(mlb_df, "./data/mlb_subtable.csv")
-```
+
 
 
 
